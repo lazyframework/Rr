@@ -5,7 +5,7 @@ using UnityEngine;
 public class RiderIK : MonoBehaviour
 {
     public BikeDrive bike;
-    public Transform grips;
+    public Transform grips;          // cadangan, hanya dipakai kalau BikeDrive tidak menemukan mesh Grips
     public float handWidth = 0.28f;
     [Range(0, 1)] public float weight = 1f;
 
@@ -19,7 +19,12 @@ public class RiderIK : MonoBehaviour
         Foot(AvatarIKGoal.LeftFoot,  AvatarIKHint.LeftKnee,  -1);
         Foot(AvatarIKGoal.RightFoot, AvatarIKHint.RightKnee, +1);
 
-        if (grips != null)
+        if (bike.HasGrips)
+        {
+            Hand(AvatarIKGoal.LeftHand,  bike.HandPos(-1));
+            Hand(AvatarIKGoal.RightHand, bike.HandPos(+1));
+        }
+        else if (grips != null)
         {
             Hand(AvatarIKGoal.LeftHand,  grips.position - bike.transform.right * handWidth);
             Hand(AvatarIKGoal.RightHand, grips.position + bike.transform.right * handWidth);
@@ -31,7 +36,7 @@ public class RiderIK : MonoBehaviour
         anim.SetIKPositionWeight(g, weight);
         anim.SetIKRotationWeight(g, weight);
         anim.SetIKPosition(g, bike.FootPos(side));
-        anim.SetIKRotation(g, bike.transform.rotation);
+        anim.SetIKRotation(g, bike.transform.rotation);   // telapak datar
         anim.SetIKHintPositionWeight(h, weight);
         anim.SetIKHintPosition(h, bike.KneePos(side));
     }
@@ -47,5 +52,7 @@ public class RiderIK : MonoBehaviour
         if (anim == null) return;
         foreach (AvatarIKGoal g in System.Enum.GetValues(typeof(AvatarIKGoal)))
         { anim.SetIKPositionWeight(g, 0); anim.SetIKRotationWeight(g, 0); }
+        foreach (AvatarIKHint h in System.Enum.GetValues(typeof(AvatarIKHint)))
+            anim.SetIKHintPositionWeight(h, 0);
     }
 }
