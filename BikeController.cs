@@ -1,9 +1,13 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using StarterAssets;
 
 // Pasang di BMX_Bike. Dinyalakan/dimatikan oleh VehicleSystem.
-// Keyboard: W/S gas, A/D belok, Space rem.
-// Mobile: panggil SetMobileInput() dari joystick UI.
+// Input yang didukung (semuanya dijumlahkan):
+//  1. Keyboard: W/S gas, A/D belok, Space rem
+//  2. Joystick Starter Assets (otomatis dari StarterAssetsInputs.move milik pemain)
+//  3. Joystick lain lewat BikeJoystickBridge, atau panggil SetMobileMove()
+//  4. Tombol rem UI: BrakeDown() / BrakeUp()
 [RequireComponent(typeof(Rigidbody))]
 public class BikeController : MonoBehaviour
 {
@@ -13,18 +17,25 @@ public class BikeController : MonoBehaviour
     public float friction = 2f;
     public float turnSpeed = 90f;
 
+    [Header("Joystick")]
+    public bool useStarterAssetsJoystick = true;
+    public float deadZone = 0.1f;
+
     Rigidbody rb;
+    StarterAssetsInputs saInputs;
+
     float mobileThrottle, mobileSteer;
     bool mobileBrake;
     float throttle, steer;
     bool brake;
 
+    public float Steer => steer;   // dibaca BikeDrive untuk memutar setir
+
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
 
-        // Box collider tanpa material punya gesekan 0.6 yang melawan gas (sepeda tidak bergerak).
-        // Beri material licin ke semua collider sepeda.
+        // Box collider tanpa material punya gesekan 0.6 yang melawan gas.
         var slide = new PhysicsMaterial("BikeSlide")
         {
             dynamicFriction = 0f,
@@ -37,12 +48,25 @@ public class BikeController : MonoBehaviour
             if (!c.isTrigger) c.sharedMaterial = slide;
     }
 
-    void OnDisable() { throttle = 0f; steer = 0f; brake = false; mobileThrottle = 0f; mobileSteer = 0f; mobileBrake = false; }
-
-    public void SetMobileInput(float t, float s, bool b)
+    void OnEnable()
     {
-        mobileThrottle = t; mobileSteer = s; mobileBrake = b;
+        if (saInputs == null) saInputs = FindFirstObjectByType<StarterAssetsInputs>();
+        if (saInputs != null) saInputs.move = Vector2.zero;   // buang sisa input lama
     }
+
+    void OnDisable()
+    {
+        throttle = 0f; steer = 0f; brake = false;
+        mobileThrottle = 0f; mobileSteer = 0f; mobileBrake = false;
+    }
+
+    // ---- API untuk joystick / tombol UI ----
+    public void SetMobileMove(float t, float s) { mobileThrottle = t; mobileSteer = s; }
+    public void SetMobileMove(Vector2 v) { mobileThrottle = v.y; mobileSteer = v.x; }
+    public void SetMobileBrake(bool b) { mobileBrake = b; }
+    public void BrakeDown() { mobileBrake = true; }
+    public void BrakeUp() { mobileBrake = false; }
+    public void SetMobileInput(float t, float s, bool b) { mobileThrottle = t; mobileSteer = s; mobileBrake = b; }
 
     void Update()
     {
@@ -54,9 +78,23 @@ public class BikeController : MonoBehaviour
             ks = (k.dKey.isPressed ? 1f : 0f) - (k.aKey.isPressed ? 1f : 0f);
             kb = k.spaceKey.isPressed;
         }
-        throttle = Mathf.Clamp(kt + mobileThrottle, -1f, 1f);
-        steer = Mathf.Clamp(ks + mobileSteer, -1f, 1f);
+
+        float jt = 0f, js = 0f;
+        if (useStarterAssetsJoystick && saInputs != null)
+        {
+            jt = saInputs.move.y;
+            js = saInputs.move.x;
+        }
+
+        throttle = Clamp(kt + mobileThrottle + jt);
+        steer = Clamp(ks + mobileSteer + js);
         brake = kb || mobileBrake;
+    }
+
+    float Clamp(float v)
+    {
+        v = Mathf.Clamp(v, -1f, 1f);
+        return Mathf.Abs(v) < deadZone ? 0f : v;
     }
 
     void FixedUpdate()
