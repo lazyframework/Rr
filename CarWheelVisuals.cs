@@ -1,29 +1,32 @@
 using UnityEngine;
 using System.Collections.Generic;
-using UnityEngine.InputSystem; // Tambahan untuk membaca Keyboard
+using UnityEngine.InputSystem;
 
-// Pasang di Car_16 (objek induk mobil). 
-// Script ini sekarang bisa memutar ban, membelokkan ban, SEKALIGUS menggerakkan mobil pakai WASD.
+// Pasang di Car_16. Memutar ban, membelokkan ban, dan menggerakkan mobil pakai WASD.
+// Mobil HANYA bisa digerakkan jika isPlayerInside bernilai true.
 public class CarWheelVisuals : MonoBehaviour
 {
     [Header("Ban (kosongkan untuk dicari otomatis)")]
-    public Transform[] frontWheels;      // berputar + belok
-    public Transform[] rearWheels;       // berputar
+    public Transform[] frontWheels;      
+    public Transform[] rearWheels;       
     public bool autoFindWheels = true;
     public string[] keywords = { "wheel", "tire", "tyre", "ban", "roda" };
 
     [Header("Pengaturan Visual Ban")]
-    public float wheelRadius = 0f;       // 0 = otomatis dari ukuran ban
-    public float wheelBase = 2.6f;       // jarak as depan ke as belakang (m)
+    public float wheelRadius = 0f;       
+    public float wheelBase = 2.6f;       
     public float maxSteerAngle = 30f;
     public float steerSpeed = 200f;
-    public bool invertSpin = false;      // ban berputar mundur? centang
-    public bool invertSteer = false;     // ban belok berlawanan? centang
+    public bool invertSpin = false;      
+    public bool invertSteer = false;     
 
     [Header("Pengaturan Kendali Mobil (WASD)")]
-    public float motorForce = 15f;       // Kecepatan akselerasi mobil
-    public float maxSpeed = 15f;         // Kecepatan maksimal mobil
-    public float turnSpeed = 60f;        // Kecepatan belok mobil
+    public float motorForce = 15f;       
+    public float maxSpeed = 15f;         
+    public float turnSpeed = 60f;        
+
+    // Variabel pengunci: hanya bisa digerakkan jika Player masuk
+    [HideInInspector] public bool isPlayerInside = false; 
 
     class W { public Transform t; public Vector3 localCenter; public bool front; public float radius; }
     readonly List<W> wheels = new List<W>();
@@ -31,7 +34,6 @@ public class CarWheelVisuals : MonoBehaviour
     Vector3 lastPos;
     float lastYaw, visualSteer;
     
-    // Variabel untuk fisika mobil
     Rigidbody rb;
     float currentSpeed = 0f;
     float actualSteerAngle = 0f;
@@ -41,7 +43,7 @@ public class CarWheelVisuals : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         if (rb == null)
         {
-            Debug.LogError("CarWheelVisuals: Mobil tidak punya Rigidbody! Tambahkan komponen Rigidbody di Car_16 agar bisa bergerak.");
+            Debug.LogError("CarWheelVisuals: Tambahkan komponen Rigidbody di mobil ini!");
         }
 
         if (autoFindWheels && (frontWheels == null || frontWheels.Length == 0) && (rearWheels == null || rearWheels.Length == 0))
@@ -51,8 +53,6 @@ public class CarWheelVisuals : MonoBehaviour
             if (frontWheels != null) foreach (var t in frontWheels) Add(t, true);
             if (rearWheels != null) foreach (var t in rearWheels) Add(t, false);
         }
-
-        if (wheels.Count == 0) Debug.LogWarning("CarWheelVisuals: tidak ada ban ditemukan.");
 
         lastPos = transform.position;
         lastYaw = transform.eulerAngles.y;
@@ -110,7 +110,22 @@ public class CarWheelVisuals : MonoBehaviour
     {
         if (rb == null) return;
 
-        // 1. BACA INPUT KEYBOARD (WASD)
+        // JIKA PLAYER TIDAK DI DALAM MOBIL, REM MOBIL DAN JANGAN BACA INPUT
+        if (!isPlayerInside)
+        {
+            currentSpeed = Mathf.MoveTowards(currentSpeed, 0f, motorForce * Time.fixedDeltaTime);
+            // Hentikan laju mobil secara perlahan (hanya biarkan gravitasi Y)
+            Vector3 localVel = transform.InverseTransformDirection(rb.linearVelocity);
+            localVel.x = Mathf.MoveTowards(localVel.x, 0f, Time.fixedDeltaTime * 10f);
+            localVel.z = Mathf.MoveTowards(localVel.z, 0f, Time.fixedDeltaTime * 10f);
+            rb.linearVelocity = transform.TransformDirection(localVel);
+            
+            rb.angularVelocity = Vector3.zero;
+            return; // Hentikan eksekusi kode di bawahnya
+        }
+
+        // --- KODE DI BAWAH INI HANYA JALAN JIKA PLAYER DI DALAM MOBIL ---
+
         float throttle = 0f;
         float steerInput = 0f;
 
@@ -123,15 +138,11 @@ public class CarWheelVisuals : MonoBehaviour
             if (Keyboard.current.aKey.isPressed) steerInput = -1f;
         }
 
-        // 2. FISIKA MAJU/MUNDUR
-        // Jika script ini aktif, mobil bisa digerakkan.
         currentSpeed = Mathf.MoveTowards(currentSpeed, throttle * maxSpeed, motorForce * Time.fixedDeltaTime);
         
-        // Terapkan kecepatan ke Rigidbody
         Vector3 moveDirection = transform.forward * currentSpeed;
         rb.linearVelocity = new Vector3(moveDirection.x, rb.linearVelocity.y, moveDirection.z);
 
-        // 3. FISIKA BELOK
         if (Mathf.Abs(currentSpeed) > 0.5f)
         {
             actualSteerAngle = Mathf.MoveTowards(actualSteerAngle, steerInput * maxSteerAngle, steerSpeed * Time.fixedDeltaTime);
@@ -151,7 +162,6 @@ public class CarWheelVisuals : MonoBehaviour
         float dt = Time.deltaTime;
         if (dt <= 0f) return;
 
-        // Hitung kecepatan roda berdasarkan pergerakan mobil
         Vector3 delta = transform.position - lastPos;
         float speed = Vector3.Dot(delta, transform.forward) / dt;
         float yaw = transform.eulerAngles.y;
@@ -162,7 +172,6 @@ public class CarWheelVisuals : MonoBehaviour
         
         if (Mathf.Abs(speed) > 80f) return;
 
-        // Hitung sudut belok visual roda depan
         float target = 0f;
         if (Mathf.Abs(speed) > 0.5f)
             target = Mathf.Atan(wheelBase * yawRate * Mathf.Deg2Rad / speed) * Mathf.Rad2Deg;
@@ -173,7 +182,6 @@ public class CarWheelVisuals : MonoBehaviour
         visualSteer = Mathf.MoveTowards(visualSteer, target, steerSpeed * dt);
         float dSteer = visualSteer - prev;
 
-        // Putar mesh roda
         foreach (var w in wheels)
         {
             if (w.t == null) continue;
