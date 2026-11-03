@@ -71,10 +71,11 @@ public class VehicleSystem : MonoBehaviour
             riderIK.enabled = false;
         }
 
+        // Pastikan CarWheelVisuals dalam keadaan terkunci di awal
         if (car != null)
         {
-            var carCtrl = car.GetComponent<CarJoystickController>();
-            if (carCtrl != null) carCtrl.enabled = false;
+            var carWheels = car.GetComponent<CarWheelVisuals>();
+            if (carWheels != null) carWheels.isPlayerInside = false;
         }
         
         if (bikeController != null) bikeController.enabled = false;
@@ -156,12 +157,16 @@ public class VehicleSystem : MonoBehaviour
 
         player.transform.SetParent(car.transform);
         
-        // Menggunakan localPosition/localRotation agar aman untuk CharacterController
         player.transform.localPosition = carSeatPosition.localPosition;
         player.transform.localRotation = carSeatPosition.localRotation;
 
-        var carCtrl = car.GetComponent<CarJoystickController>();
-        if (carCtrl != null) carCtrl.enabled = true;
+        // BUKA KUNCI MOBIL
+        var carWheels = car.GetComponent<CarWheelVisuals>();
+        if (carWheels != null) carWheels.isPlayerInside = true;
+
+        // Matikan script lama jika masih ada
+        var oldCarCtrl = car.GetComponent<CarJoystickController>();
+        if (oldCarCtrl != null) oldCarCtrl.enabled = false; 
         
         if (playerCamera != null) playerCamera.SetActive(false); 
         if (carCamera != null) carCamera.SetActive(true);
@@ -172,11 +177,9 @@ public class VehicleSystem : MonoBehaviour
         isInVehicle = true; isInBike = true;
         DisablePlayerControl();
 
-        // Jadikan child sepeda, jaga posisi dan skala dunia
         player.transform.SetParent(bike.transform, true);
         player.transform.rotation = bike.transform.rotation;
 
-        // Hentikan animasi lari supaya pose awal netral
         if (playerAnim != null)
         {
             playerAnim.SetFloat("Speed", 0f);
@@ -187,7 +190,6 @@ public class VehicleSystem : MonoBehaviour
             playerAnim.Update(0f);
         }
 
-        // Taruh PINGGUL karakter tepat di sadel
         Vector3 target = bikeSeatPosition != null
             ? bikeSeatPosition.position
             : bike.transform.TransformPoint(bikeHipLocalPos);
@@ -196,10 +198,10 @@ public class VehicleSystem : MonoBehaviour
         if (hips != null) player.transform.position += target - hips.position;
         else player.transform.position = target - Vector3.up * 0.95f;
 
-        if (riderIK != null) riderIK.enabled = true;       // kaki ke pedal, tangan ke stang
+        if (riderIK != null) riderIK.enabled = true;       
         
         if (bikeController != null) bikeController.enabled = true;
-        else Debug.LogError("BikeController belum dipasang di " + bike.name + " - sepeda tidak akan bergerak!");
+        else Debug.LogError("BikeController belum dipasang di " + bike.name);
 
         if (playerCamera != null) playerCamera.SetActive(false);
         if (bikeCamera != null) bikeCamera.SetActive(true);
@@ -225,8 +227,12 @@ public class VehicleSystem : MonoBehaviour
             player.transform.position = car.transform.position + (car.transform.right * -2f) + (Vector3.up * 1f);
             player.transform.rotation = Quaternion.Euler(0f, car.transform.eulerAngles.y, 0f);
             
-            var carCtrl = car.GetComponent<CarJoystickController>();
-            if (carCtrl != null) carCtrl.enabled = false;
+            // TUTUP KUNCI MOBIL (Agar diam saat ditinggal)
+            var carWheels = car.GetComponent<CarWheelVisuals>();
+            if (carWheels != null) carWheels.isPlayerInside = false;
+
+            var oldCarCtrl = car.GetComponent<CarJoystickController>();
+            if (oldCarCtrl != null) oldCarCtrl.enabled = false;
             
             if (carCamera != null) carCamera.SetActive(false);
         }
