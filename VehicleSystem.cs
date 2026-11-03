@@ -170,6 +170,7 @@ public class VehicleSystem : MonoBehaviour
 
         if (riderIK != null) riderIK.enabled = true;       // kaki ke pedal, tangan ke stang
         if (bikeController != null) bikeController.enabled = true;
+        else Debug.LogError("BikeController belum dipasang di " + bike.name + " - sepeda tidak akan bergerak!");
 
         playerCamera.SetActive(false);
         if (bikeCamera != null) bikeCamera.SetActive(true);
