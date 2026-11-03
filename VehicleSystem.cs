@@ -39,40 +39,55 @@ public class VehicleSystem : MonoBehaviour
 
     void Start()
     {
-        playerController = player.GetComponent<ThirdPersonController>();
-        charController = player.GetComponent<CharacterController>();
-        playerInput = player.GetComponent<PlayerInput>();
-        playerAnim = player.GetComponent<Animator>();
-
-        bikeController = bike.GetComponent<BikeController>();
-        bikeDrive = bike.GetComponent<BikeDrive>();
-        bikeRb = bike.GetComponent<Rigidbody>();
-        if (bikeDrive != null && bikeDrive.rb == null) bikeDrive.rb = bikeRb;
-
-        if (bikeGrips == null)
+        if (player != null)
         {
-            foreach (var t in bike.GetComponentsInChildren<Transform>(true))
-                if (t.name == "Grips") { bikeGrips = t; break; }
+            playerController = player.GetComponent<ThirdPersonController>();
+            charController = player.GetComponent<CharacterController>();
+            playerInput = player.GetComponent<PlayerInput>();
+            playerAnim = player.GetComponent<Animator>();
+        }
+
+        if (bike != null)
+        {
+            bikeController = bike.GetComponent<BikeController>();
+            bikeDrive = bike.GetComponent<BikeDrive>();
+            bikeRb = bike.GetComponent<Rigidbody>();
+            if (bikeDrive != null && bikeDrive.rb == null) bikeDrive.rb = bikeRb;
+
+            if (bikeGrips == null)
+            {
+                foreach (var t in bike.GetComponentsInChildren<Transform>(true))
+                    if (t.name == "Grips") { bikeGrips = t; break; }
+            }
         }
 
         // RiderIK dibuat otomatis, mati sampai pemain naik sepeda
-        riderIK = player.GetComponent<RiderIK>();
-        if (riderIK == null) riderIK = player.AddComponent<RiderIK>();
-        riderIK.bike = bikeDrive;
-        riderIK.grips = bikeGrips;
-        riderIK.enabled = false;
+        if (player != null)
+        {
+            riderIK = player.GetComponent<RiderIK>();
+            if (riderIK == null) riderIK = player.AddComponent<RiderIK>();
+            riderIK.bike = bikeDrive;
+            riderIK.grips = bikeGrips;
+            riderIK.enabled = false;
+        }
 
-        var carCtrl = car.GetComponent<CarJoystickController>();
-        if (carCtrl != null) carCtrl.enabled = false;
+        if (car != null)
+        {
+            var carCtrl = car.GetComponent<CarJoystickController>();
+            if (carCtrl != null) carCtrl.enabled = false;
+        }
+        
         if (bikeController != null) bikeController.enabled = false;
 
-        carCamera.SetActive(false);
+        if (carCamera != null) carCamera.SetActive(false);
         if (bikeCamera != null) bikeCamera.SetActive(false);
         if (btnInteraksi != null) btnInteraksi.SetActive(false);
     }
 
     void Update()
     {
+        if (player == null || car == null || bike == null) return;
+
         if (isInVehicle)
         {
             if (btnInteraksi != null) btnInteraksi.SetActive(true);
@@ -98,6 +113,8 @@ public class VehicleSystem : MonoBehaviour
     // Dipanggil oleh Tombol UI saat di HP
     public void TombolAksiDitekan()
     {
+        if (player == null || car == null || bike == null) return;
+
         if (isInVehicle)
         {
             ExitVehicle();
@@ -114,29 +131,40 @@ public class VehicleSystem : MonoBehaviour
 
     void DisablePlayerControl()
     {
-        playerController.enabled = false;
-        charController.enabled = false;
+        if (playerController != null) playerController.enabled = false;
+        if (charController != null) charController.enabled = false;
         if (playerInput != null) playerInput.enabled = false;
     }
 
     void EnablePlayerControl()
     {
-        playerController.enabled = true;
-        charController.enabled = true;
+        if (playerController != null) playerController.enabled = true;
+        if (charController != null) charController.enabled = true;
         if (playerInput != null) playerInput.enabled = true;
     }
 
     void EnterCar()
     {
+        if (carSeatPosition == null)
+        {
+            Debug.LogError("Car Seat Position belum diisi di Inspector VehicleSystem!");
+            return;
+        }
+
         isInVehicle = true; isInBike = false;
         DisablePlayerControl();
 
         player.transform.SetParent(car.transform);
-        player.transform.position = carSeatPosition.position;
-        player.transform.rotation = carSeatPosition.rotation;
+        
+        // Menggunakan localPosition/localRotation agar aman untuk CharacterController
+        player.transform.localPosition = carSeatPosition.localPosition;
+        player.transform.localRotation = carSeatPosition.localRotation;
 
-        car.GetComponent<CarJoystickController>().enabled = true;
-        playerCamera.SetActive(false); carCamera.SetActive(true);
+        var carCtrl = car.GetComponent<CarJoystickController>();
+        if (carCtrl != null) carCtrl.enabled = true;
+        
+        if (playerCamera != null) playerCamera.SetActive(false); 
+        if (carCamera != null) carCamera.SetActive(true);
     }
 
     void EnterBike()
@@ -169,10 +197,11 @@ public class VehicleSystem : MonoBehaviour
         else player.transform.position = target - Vector3.up * 0.95f;
 
         if (riderIK != null) riderIK.enabled = true;       // kaki ke pedal, tangan ke stang
+        
         if (bikeController != null) bikeController.enabled = true;
         else Debug.LogError("BikeController belum dipasang di " + bike.name + " - sepeda tidak akan bergerak!");
 
-        playerCamera.SetActive(false);
+        if (playerCamera != null) playerCamera.SetActive(false);
         if (bikeCamera != null) bikeCamera.SetActive(true);
     }
 
@@ -195,12 +224,15 @@ public class VehicleSystem : MonoBehaviour
         {
             player.transform.position = car.transform.position + (car.transform.right * -2f) + (Vector3.up * 1f);
             player.transform.rotation = Quaternion.Euler(0f, car.transform.eulerAngles.y, 0f);
-            car.GetComponent<CarJoystickController>().enabled = false;
-            carCamera.SetActive(false);
+            
+            var carCtrl = car.GetComponent<CarJoystickController>();
+            if (carCtrl != null) carCtrl.enabled = false;
+            
+            if (carCamera != null) carCamera.SetActive(false);
         }
 
         EnablePlayerControl();
-        playerCamera.SetActive(true);
+        if (playerCamera != null) playerCamera.SetActive(true);
         if (btnInteraksi != null) btnInteraksi.SetActive(false);
     }
 
