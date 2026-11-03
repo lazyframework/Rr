@@ -19,7 +19,23 @@ public class BikeController : MonoBehaviour
     float throttle, steer;
     bool brake;
 
-    void Awake() { rb = GetComponent<Rigidbody>(); }
+    void Awake()
+    {
+        rb = GetComponent<Rigidbody>();
+
+        // Box collider tanpa material punya gesekan 0.6 yang melawan gas (sepeda tidak bergerak).
+        // Beri material licin ke semua collider sepeda.
+        var slide = new PhysicsMaterial("BikeSlide")
+        {
+            dynamicFriction = 0f,
+            staticFriction = 0f,
+            bounciness = 0f,
+            frictionCombine = PhysicsMaterialCombine.Minimum,
+            bounceCombine = PhysicsMaterialCombine.Minimum
+        };
+        foreach (var c in GetComponentsInChildren<Collider>())
+            if (!c.isTrigger) c.sharedMaterial = slide;
+    }
 
     void OnDisable() { throttle = 0f; steer = 0f; brake = false; mobileThrottle = 0f; mobileSteer = 0f; mobileBrake = false; }
 
